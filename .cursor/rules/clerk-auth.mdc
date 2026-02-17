@@ -241,24 +241,38 @@ export async function POST(request: Request) {
 import { auth } from '@clerk/nextjs/server';
 import { db } from '@/src/db';
 import { decksTable } from '@/src/db/schema';
-import { eq } from 'drizzle-orm';
+import { z } from 'zod';
+import { revalidatePath } from 'next/cache';
 
-export async function createDeck(formData: FormData) {
+// Define Zod schema for validation
+const createDeckSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100),
+  description: z.string().max(500).optional(),
+});
+
+// TypeScript type derived from Zod schema
+type CreateDeckInput = z.infer<typeof createDeckSchema>;
+
+export async function createDeck(input: CreateDeckInput) {
   const { userId } = await auth();
   
   if (!userId) {
     throw new Error('Unauthorized');
   }
 
-  const name = formData.get('name') as string;
+  // Validate input with Zod
+  const validatedData = createDeckSchema.parse(input);
   
   const [deck] = await db
     .insert(decksTable)
     .values({
       userId,
-      name,
+      name: validatedData.name,
+      description: validatedData.description,
     })
     .returning();
+
+  revalidatePath('/decks');
 
   return deck;
 }
