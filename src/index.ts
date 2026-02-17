@@ -1,0 +1,48 @@
+import 'dotenv/config';
+import { drizzle } from 'drizzle-orm/neon-http';
+import { neon } from '@neondatabase/serverless';
+import { eq } from 'drizzle-orm';
+import { usersTable } from './db/schema';
+
+// Initialize the database
+const sql = neon(process.env.DATABASE_URL!);
+const db = drizzle({ client: sql });
+
+async function main() {
+  console.log('🚀 Starting database operations...\n');
+
+  // Create a new user
+  const user: typeof usersTable.$inferInsert = {
+    name: 'John',
+    age: 30,
+    email: 'john@example.com',
+  };
+
+  await db.insert(usersTable).values(user);
+  console.log('✅ New user created!');
+
+  // Read all users
+  const users = await db.select().from(usersTable);
+  console.log('📖 Getting all users from the database:', users);
+
+  // Update user
+  await db
+    .update(usersTable)
+    .set({
+      age: 31,
+    })
+    .where(eq(usersTable.email, user.email));
+  console.log('✅ User info updated!');
+
+  // Verify update
+  const updatedUsers = await db.select().from(usersTable).where(eq(usersTable.email, user.email));
+  console.log('📖 Updated user:', updatedUsers);
+
+  // Delete user
+  await db.delete(usersTable).where(eq(usersTable.email, user.email));
+  console.log('✅ User deleted!');
+
+  console.log('\n🎉 All operations completed successfully!');
+}
+
+main();

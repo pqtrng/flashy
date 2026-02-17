@@ -1,0 +1,165 @@
+---
+alwaysApply: true
+---
+# Drizzle ORM Database Interactions
+
+This project uses **Drizzle ORM** for all database interactions with a Neon Postgres database.
+
+## Database Instance
+
+All database operations must use the database instance from [src/db/index.ts](mdc:src/db/index.ts):
+
+```typescript
+import { db } from '@/src/db';
+```
+
+## Schema
+
+The database schema is defined in [src/db/schema.ts](mdc:src/db/schema.ts) and includes:
+
+- **decksTable**: Collections of flashcards
+  - `id` (integer, primary key)
+  - `userId` (varchar, Clerk user ID)
+  - `name` (varchar, deck name)
+  - `description` (text, optional)
+  - `createdAt` (timestamp)
+  - `updatedAt` (timestamp)
+
+- **cardsTable**: Individual flashcards within a deck
+  - `id` (integer, primary key)
+  - `deckId` (integer, foreign key to decks)
+  - `front` (text, front of card)
+  - `back` (text, back of card)
+  - `createdAt` (timestamp)
+  - `updatedAt` (timestamp)
+
+## Guidelines
+
+### ✅ DO
+
+- Always import table schemas from `@/src/db/schema`
+- Use Drizzle query methods: `select()`, `insert()`, `update()`, `delete()`
+- Use type-safe Drizzle queries with the imported schemas
+- Use the `eq()`, `and()`, `or()` helpers from `drizzle-orm` for conditions
+- Use transactions when performing multiple related operations
+
+### ❌ DON'T
+
+- Never use raw SQL queries directly
+- Don't bypass the Drizzle schema definitions
+- Don't use other ORMs or query builders
+
+## Examples
+
+### Query Records
+
+```typescript
+import { db } from '@/src/db';
+import { decksTable, cardsTable } from '@/src/db/schema';
+import { eq } from 'drizzle-orm';
+
+// Get all decks for a user
+const userDecks = await db
+  .select()
+  .from(decksTable)
+  .where(eq(decksTable.userId, userId));
+
+// Get cards in a deck
+const deckCards = await db
+  .select()
+  .from(cardsTable)
+  .where(eq(cardsTable.deckId, deckId));
+```
+
+### Insert Records
+
+```typescript
+import { db } from '@/src/db';
+import { decksTable, cardsTable } from '@/src/db/schema';
+
+// Create a new deck
+const [newDeck] = await db
+  .insert(decksTable)
+  .values({
+    userId: 'user_123',
+    name: 'Learn Vietnamese',
+    description: 'Vietnamese language flashcards',
+  })
+  .returning();
+
+// Create a new card
+const [newCard] = await db
+  .insert(cardsTable)
+  .values({
+    deckId: newDeck.id,
+    front: 'Dog',
+    back: 'Chó',
+  })
+  .returning();
+```
+
+### Update Records
+
+```typescript
+import { db } from '@/src/db';
+import { decksTable } from '@/src/db/schema';
+import { eq } from 'drizzle-orm';
+
+// Update a deck
+await db
+  .update(decksTable)
+  .set({
+    name: 'Updated Deck Name',
+    updatedAt: new Date(),
+  })
+  .where(eq(decksTable.id, deckId));
+```
+
+### Delete Records
+
+```typescript
+import { db } from '@/src/db';
+import { cardsTable } from '@/src/db/schema';
+import { eq } from 'drizzle-orm';
+
+// Delete a card (decks cascade delete their cards)
+await db
+  .delete(cardsTable)
+  .where(eq(cardsTable.id, cardId));
+```
+
+### Join Queries
+
+```typescript
+import { db } from '@/src/db';
+import { decksTable, cardsTable } from '@/src/db/schema';
+import { eq } from 'drizzle-orm';
+
+// Get decks with their cards
+const decksWithCards = await db
+  .select()
+  .from(decksTable)
+  .leftJoin(cardsTable, eq(cardsTable.deckId, decksTable.id))
+  .where(eq(decksTable.userId, userId));
+```
+
+## Schema Changes
+
+After modifying [src/db/schema.ts](mdc:src/db/schema.ts), always run:
+
+```bash
+npm run db:push
+```
+
+Or generate and apply migrations:
+
+```bash
+npm run db:generate
+npm run db:migrate
+```
+
+## Resources
+
+- [Drizzle ORM Documentation](https://orm.drizzle.team/)
+- [Drizzle Query API](https://orm.drizzle.team/docs/select)
+- Configuration: [drizzle.config.ts](mdc:drizzle.config.ts)
